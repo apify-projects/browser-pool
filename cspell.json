@@ -1,0 +1,26 @@
+{
+    "version": "0.2",
+    "ignorePaths": [
+        "cspell-words.txt",
+        "samples"
+    ],
+    "dictionaryDefinitions": [
+        {
+            "name": "project-words",
+            "path": "./cspell-words.txt",
+            "addWords": true
+        },
+        {
+            "name": "classes",
+            "path": "./cspell-classes.txt",
+            "addWords": true
+        }
+    ],
+    "dictionaries": [
+        "project-words",
+        "classes"
+    ],
+    "words": [],
+    "ignoreWords": [],
+    "import": []
+}
