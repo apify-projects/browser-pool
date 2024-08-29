@@ -7,10 +7,13 @@
 		"node": ">=20.0.0"
 	},
 	"dependencies": {
-		"apify": "^3.1.10"
+		"apify": "^3.1.10",
+		"http-proxy": "^1.18.1",
+		"playwright": "^1.46.1"
 	},
 	"devDependencies": {
 		"@apify/tsconfig": "^0.1.0",
+		"@types/http-proxy": "^1.17.15",
 		"tsx": "^4.6.2",
 		"typescript": "^5.3.3"
 	},
