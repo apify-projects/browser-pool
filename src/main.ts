@@ -1,12 +1,13 @@
 import http from 'http';
 import { Actor, log } from 'apify';
 import { chromium } from 'playwright';
+import { version as serverPWVersion } from 'playwright/package.json'
 import httpProxy from 'http-proxy';
 import stream from 'stream'
 
 await Actor.init();
 
-async function spawnAndProxy(req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) {
+async function spawnAndProxyPlaywrightBrowser(req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) {
     const browserServer = await chromium.launchServer({ headless: false });
     const wsEndpoint = browserServer.wsEndpoint();
 
@@ -50,5 +51,25 @@ server.listen(port, () => log.info('Server is listening', { port }));
 
 server.on('upgrade', async (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) => {
     log.info('WS request', req.headers);
-    await spawnAndProxy(req, socket, head);
+
+    const userAgent = req.headers['user-agent'];
+
+    const isPlaywright = userAgent?.startsWith('Playwright') ?? false;
+    if (!isPlaywright) {
+        log.error('Currently, only Playwright is supported');
+        socket.end();
+        return;
+    }
+
+    const playwrightBrowser = req.headers['x-playwright-browser'];
+    if (playwrightBrowser !== 'chromium') {
+        log.error('Currently, only chromium is supported');
+        socket.end();
+        return;
+    }
+
+    const clientPWVersion = userAgent?.match(/^Playwright\/([\d\.]+)/)?.at(-1)
+
+    log.info('Playwright CDP connection', { serverPWVersion, clientPWVersion })
+    await spawnAndProxyPlaywrightBrowser(req, socket, head);
 })
