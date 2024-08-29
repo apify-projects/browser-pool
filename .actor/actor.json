@@ -1,8 +1,8 @@
 {
 	"actorSpecification": 1,
 	"name": "browser-pool",
-	"title": "Standby Actor in TypeScript",
-	"description": "Standby Actor in TypeScript.",
+	"title": "Browser Pool",
+	"description": "A Standby Actor for providing a pool of on-demand browsers, accessible through CDP.",
 	"version": "0.0",
 	"buildTag": "latest",
 	"usesStandbyMode": true,
