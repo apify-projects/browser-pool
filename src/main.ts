@@ -1,14 +1,17 @@
 import http from 'http';
+import stream from 'stream';
+
 import { Actor, log } from 'apify';
-import { chromium } from 'playwright';
-import { version as serverPWVersion } from 'playwright/package.json'
 import httpProxy from 'http-proxy';
-import stream from 'stream'
+import { chromium } from 'playwright';
+import { version as serverPWVersion } from 'playwright/package.json';
 
 await Actor.init();
 
 async function spawnAndProxyPlaywrightBrowser(req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) {
-    const browserServer = await chromium.launchServer({ headless: false });
+    const browserServer = await chromium.launchServer({
+        headless: Actor.isAtHome(),
+    });
     const wsEndpoint = browserServer.wsEndpoint();
 
     socket.once('close', async () => {
@@ -22,7 +25,7 @@ async function spawnAndProxyPlaywrightBrowser(req: http.IncomingMessage, socket:
     delete req.headers.origin;
     req.url = '';
 
-    const proxy = httpProxy.createProxyServer()
+    const proxy = httpProxy.createProxyServer();
     proxy.ws(
         req,
         socket,
@@ -33,10 +36,10 @@ async function spawnAndProxyPlaywrightBrowser(req: http.IncomingMessage, socket:
             ws: true,
         },
         async (error) => {
-          log.error('Error creating proxy, closing browser server', { wsEndpoint, error });
-          await browserServer.close();
+            log.error('Error creating proxy, closing browser server', { wsEndpoint, error });
+            await browserServer.close();
         },
-    )
+    );
 }
 
 const port = Actor.config.get('standbyPort') || process.env.ACTOR_WEB_SERVER_PORT || 3000;
@@ -68,8 +71,8 @@ server.on('upgrade', async (req: http.IncomingMessage, socket: stream.Duplex, he
         return;
     }
 
-    const clientPWVersion = userAgent?.match(/^Playwright\/([\d\.]+)/)?.at(-1)
+    const clientPWVersion = userAgent?.match(/^Playwright\/([\d.]+)/)?.at(-1);
 
-    log.info('Playwright CDP connection', { serverPWVersion, clientPWVersion })
+    log.info('Playwright CDP connection', { serverPWVersion, clientPWVersion });
     await spawnAndProxyPlaywrightBrowser(req, socket, head);
-})
+});

@@ -12,8 +12,12 @@
 		"playwright": "^1.46.1"
 	},
 	"devDependencies": {
+		"@apify/eslint-config-ts": "^0.3.0",
 		"@apify/tsconfig": "^0.1.0",
 		"@types/http-proxy": "^1.17.15",
+		"@typescript-eslint/eslint-plugin": "^6.7.2",
+		"@typescript-eslint/parser": "^6.7.2",
+		"eslint": "^8.57.0",
 		"tsx": "^4.6.2",
 		"typescript": "^5.3.3"
 	},
@@ -22,7 +26,10 @@
 		"start:prod": "node dist/main.js",
 		"start:dev": "tsx src/main.ts",
 		"build": "tsc",
-		"test": "echo \"Error: oops, the actor has no tests yet, sad!\" && exit 1"
+		"lint": "eslint ./src --ext .ts",
+		"lint:fix": "eslint ./src --ext .ts --fix",
+		"test": "echo \"Error: oops, the actor has no tests yet, sad!\" && exit 1",
+		"postinstall": "npx crawlee install-playwright-browsers"
 	},
 	"author": "It's not you it's me",
 	"license": "ISC"
