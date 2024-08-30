@@ -17,7 +17,7 @@ export async function getProxyConfiguration(
         groups?: string[]
         countryCode?: string
     },
-) {
+): Promise<{ server: string; bypass?: string; username?: string; password?: string; } | undefined> {
     if (!options.defaultProxy && !options.groups && !options.countryCode) {
         return undefined;
     }
@@ -35,7 +35,7 @@ export async function getProxyConfiguration(
     log.info('Creating proxy configuration', proxyOptions);
     const proxyConfiguration = await Actor.createProxyConfiguration(proxyOptions);
 
-    const server = await proxyConfiguration?.newUrl();
-    if (!server) { return undefined; }
-    return { server };
+    const proxyInfo = await proxyConfiguration?.newProxyInfo();
+    if (!proxyInfo) { return undefined; }
+    return { server: proxyInfo.url, username: proxyInfo.username, password: proxyInfo.password };
 }

@@ -13,12 +13,13 @@ export async function spawnAndProxyPlaywrightBrowser(req: http.IncomingMessage, 
     log.info('Launching Playwright server', launchOptions);
     let browserServer: BrowserServer;
     try {
+        const proxy = await getProxyConfiguration({
+            defaultProxy: launchOptions.proxy,
+            groups: launchOptions.proxyGroups,
+            countryCode: launchOptions.proxyCountry,
+        });
         browserServer = await chromium.launchServer({
-            proxy: await getProxyConfiguration({
-                defaultProxy: launchOptions.proxy,
-                groups: launchOptions.proxyGroups,
-                countryCode: launchOptions.proxyCountry,
-            }),
+            proxy,
             headless: launchOptions.launch?.headless,
             args: launchOptions.launch?.args,
             ignoreDefaultArgs: launchOptions.ignoreDefaultPath,
