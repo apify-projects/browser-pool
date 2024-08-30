@@ -1,9 +1,26 @@
+import fs from 'fs';
 import http from 'http';
 import stream from 'stream';
 
 import { Actor, log } from 'apify';
-import { version as serverPWVersion } from 'playwright/package.json';
 import { spawnAndProxyPlaywrightBrowser } from './browser-playwright.js';
+
+const NODE_DEPENDENCIES: Record<string, string> = {};
+if (process.env.npm_package_json) {
+    const parsedPackageJson = JSON.parse(fs.readFileSync(process.env.npm_package_json).toString());
+    if (typeof parsedPackageJson === 'object' && parsedPackageJson !== null) {
+        if (
+            'dependencies' in parsedPackageJson
+            && typeof parsedPackageJson.dependencies === 'object'
+            && parsedPackageJson.dependencies !== null
+        ) {
+            for (const [pkg, version] of Object.entries(parsedPackageJson.dependencies)) {
+                if (typeof pkg !== 'string' || typeof version !== 'string') { continue; }
+                NODE_DEPENDENCIES[pkg] = version;
+            }
+        }
+    }
+}
 
 await Actor.init();
 
@@ -38,6 +55,6 @@ server.on('upgrade', async (req: http.IncomingMessage, socket: stream.Duplex, he
 
     const clientPWVersion = userAgent?.match(/^Playwright\/([\d.]+)/)?.at(-1);
 
-    log.info('Playwright CDP connection', { serverPWVersion, clientPWVersion });
+    log.info('Playwright CDP connection', { serverPWVersion: NODE_DEPENDENCIES.playwright ?? null, clientPWVersion });
     await spawnAndProxyPlaywrightBrowser(req, socket, head);
 });
