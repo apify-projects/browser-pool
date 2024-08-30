@@ -17,7 +17,7 @@ export interface LaunchOptions {
     }
     ignoreDefaultPath?: boolean
     timeout?: number
-    // TODO: ttl?: number
+    ttl?: number
 }
 
 function parseBooleanString(value: string): boolean | undefined {
@@ -144,15 +144,15 @@ export function parseReqParams(path: string) {
         }
     }
 
-    // const ttl = params.get('ttl');
-    // if (ttl !== null) {
-    //     const parsedTtl = parseIntegerString(ttl);
-    //     if (parsedTtl) {
-    //         launchOptions.ttl = parsedTtl;
-    //     } else {
-    //         log.warning('Invalid ttl param', { ttl });
-    //     }
-    // }
+    const ttl = params.get('ttl');
+    if (ttl !== null) {
+        const parsedTtl = parseIntegerString(ttl);
+        if (parsedTtl) {
+            launchOptions.ttl = parsedTtl;
+        } else {
+            log.warning('Invalid ttl param', { ttl });
+        }
+    }
 
     return launchOptions;
 }

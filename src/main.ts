@@ -3,7 +3,7 @@ import http from 'http';
 import stream from 'stream';
 
 import { Actor, log } from 'apify';
-import { spawnAndProxyPlaywrightBrowser } from './browser-playwright.js';
+import { PlaywrightInstanceManager } from './browser-playwright.js';
 
 const NODE_DEPENDENCIES: Record<string, string> = {};
 if (process.env.npm_package_json) {
@@ -23,6 +23,8 @@ if (process.env.npm_package_json) {
 }
 
 await Actor.init();
+
+const playwrightInstanceManager = new PlaywrightInstanceManager();
 
 const port = Actor.config.get('standbyPort') || process.env.ACTOR_WEB_SERVER_PORT || 3000;
 
@@ -56,5 +58,5 @@ server.on('upgrade', async (req: http.IncomingMessage, socket: stream.Duplex, he
     const clientPWVersion = userAgent?.match(/^Playwright\/([\d.]+)/)?.at(-1);
 
     log.info('Playwright CDP connection', { serverPWVersion: NODE_DEPENDENCIES.playwright ?? null, clientPWVersion });
-    await spawnAndProxyPlaywrightBrowser(req, socket, head);
+    await playwrightInstanceManager.spawnAndProxyBrowser(req, socket, head);
 });
