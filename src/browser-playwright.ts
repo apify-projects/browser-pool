@@ -46,7 +46,7 @@ export class PlaywrightInstanceManager {
                 proxy,
                 headless: launchOptions.launch?.headless,
                 args: launchOptions.launch?.args,
-                ignoreDefaultArgs: launchOptions.ignoreDefaultPath,
+                ignoreDefaultArgs: launchOptions.ignoreDefaultArgs,
                 timeout: launchOptions.timeout,
             });
         } catch (e) {

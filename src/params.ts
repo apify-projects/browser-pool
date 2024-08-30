@@ -15,7 +15,7 @@ export interface LaunchOptions {
         headless?: boolean
         args?: string[]
     }
-    ignoreDefaultPath?: boolean
+    ignoreDefaultArgs?: boolean
     timeout?: number
     ttl?: number
 }
@@ -124,13 +124,13 @@ export function parseReqParams(path: string) {
         }
     }
 
-    const ignoreDefaultPath = params.get('ignoreDefaultPath');
-    if (ignoreDefaultPath !== null) {
-        const parsedIgnoreDefaultPath = parseBooleanString(ignoreDefaultPath);
+    const ignoreDefaultArgs = params.get('ignoreDefaultArgs');
+    if (ignoreDefaultArgs !== null) {
+        const parsedIgnoreDefaultPath = parseBooleanString(ignoreDefaultArgs);
         if (parsedIgnoreDefaultPath) {
-            launchOptions.ignoreDefaultPath = parsedIgnoreDefaultPath;
+            launchOptions.ignoreDefaultArgs = parsedIgnoreDefaultPath;
         } else {
-            log.warning('Invalid ignoreDefaultPath param', { ignoreDefaultPath });
+            log.warning('Invalid ignoreDefaultPath param', { ignoreDefaultPath: ignoreDefaultArgs });
         }
     }
 
