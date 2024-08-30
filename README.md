@@ -5,7 +5,11 @@ A Standby Actor for providing a pool of on-demand browsers, accessible through C
 ## How to use it
 
 ```js
+import { chromium } from 'playwright';
+
+// The Standby URL with `wss` instead of `https`
 const wsEndpoint = 'wss://$USERNAME--$ACTOR.apify.actor?token=$TOKEN&other_params...'
+const browser = await chromium.connect(wsEndpoint)
 ```
 
 ### Available parameters
