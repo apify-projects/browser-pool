@@ -42,7 +42,7 @@ export class SessionManager {
                         timeout: launchOptions.timeout,
                     });
                 } catch (e) {
-                    log.exception(e, 'Failed to launch server', { sessionType: session.type, sessionId: session.id });
+                    log.exception(e as Error, 'Failed to launch server', { sessionType: session.type, sessionId: session.id });
                     session.status = 'ERROR';
                     return false;
                 }
@@ -64,6 +64,10 @@ export class SessionManager {
             log.error('Cannot end session: not found', { id });
             return false;
         }
+        if (!session.server) {
+            log.error('Cannot end session: server is undefined', { type: session.type, id });
+            return false;
+        }
 
         const endedAt = Date.now();
 
@@ -72,7 +76,7 @@ export class SessionManager {
                 try {
                     await session.server.close();
                 } catch (e) {
-                    log.exception(e, 'Failed to close server', { sessionType: session.type, sessionId: session.id });
+                    log.exception(e as Error, 'Failed to close server', { sessionType: session.type, sessionId: session.id });
                     session.status = 'ERROR';
                     return false;
                 }
@@ -108,9 +112,11 @@ export class SessionManager {
             log.info('Disconnected from session, ending', { type: session.type, id });
             await this.endSession(id);
         }
+
+        return true;
     }
 
-    async proxySession(id: string, req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) {
+    async proxySession(id: string, req: http.IncomingMessage, socket: stream.Duplex, head: Buffer): Promise<boolean> {
         const session = this.sessions.get(id);
         if (!session) {
             log.error('Cannot proxy session: not found, closing socket', { id });
@@ -120,6 +126,10 @@ export class SessionManager {
         if (session.status !== 'RUNNING') {
             log.error('Trying to connect to a session which is not running', { type: session.type, id });
             socket.end();
+            return false;
+        }
+        if (!session.server) {
+            log.error('Cannot proxy session: server is undefined', { type: session.type, id });
             return false;
         }
 
@@ -155,6 +165,8 @@ export class SessionManager {
                 socket.end();
             },
         );
+
+        return true;
     }
 }
 
