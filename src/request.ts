@@ -1,24 +1,8 @@
 import { log } from 'apify';
-import { DefaultProxy, isDefaultProxy } from './proxies.js';
+import http from 'http';
 
-/**
- * Aims to be compatible with:
- * - https://docs.browserless.io/chrome-flags/
- */
-export interface LaunchOptions {
-    proxy?: DefaultProxy
-    proxyGroups?: string[]
-    proxyCountry?: string
-    // TODO: blockAds?: boolean
-    launch?: {
-        // TODO: stealth?: boolean
-        headless?: boolean
-        args?: string[]
-    }
-    ignoreDefaultArgs?: boolean
-    timeout?: number
-    ttl?: number
-}
+import { isDefaultProxy } from './proxies.js';
+import { LaunchOptions, RequestParams, SessionType } from './types.js';
 
 function parseBooleanString(value: string): boolean | undefined {
     if (value === 'true') { return true; }
@@ -48,8 +32,10 @@ function parseIntegerString(value: string): number | undefined {
  * @param path the final part of the URL, e.g., "/", "/?proxy=residential"
  * @returns parsed and validated launchOptions
  */
-export function parseReqParams(path: string) {
+export function parseLaunchOptions(req: http.IncomingMessage): LaunchOptions {
     const launchOptions: LaunchOptions = {};
+
+    const path = req.url ?? '/';
 
     let params: URLSearchParams;
     try {
@@ -57,6 +43,21 @@ export function parseReqParams(path: string) {
     } catch (e) {
         log.exception(e as Error, 'Error parsing request URL');
         return launchOptions;
+    }
+
+    const sessionId = params.get('sessionId');
+    if (sessionId !== null) {
+        launchOptions.sessionId = sessionId;
+    }
+
+    const enableProxy = params.get('enableProxy');
+    if (enableProxy !== null) {
+        const parsedEnableProxy = parseBooleanString(enableProxy);
+        if (parsedEnableProxy) {
+            launchOptions.enableProxy = parsedEnableProxy;
+        } else {
+            log.warning('Invalid enableProxy param', { enableProxy });
+        }
     }
 
     const proxy = params.get('proxy');
@@ -155,4 +156,30 @@ export function parseReqParams(path: string) {
     }
 
     return launchOptions;
+}
+
+export function parseSessionParams(req: http.IncomingMessage): RequestParams | undefined {
+    const userAgent = req.headers['user-agent'];
+
+    let type: SessionType;
+    if (userAgent?.startsWith('Playwright')) {
+        type = 'playwright';
+    } else {
+        log.error('Error parsing, or unsupported, session type', { userAgent });
+        return undefined;
+    }
+
+    const sessionParams: RequestParams = { type };
+
+    switch (sessionParams.type) {
+        case 'playwright':
+            if (typeof req.headers['x-playwright-browser'] === 'string') {
+                sessionParams.playwrightBrowser = req.headers['x-playwright-browser'];
+            }
+            sessionParams.playwrightVersion = userAgent?.match(/^Playwright\/([\d.]+)/)?.at(-1);
+            break;
+        default:
+    }
+
+    return sessionParams;
 }
