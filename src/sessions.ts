@@ -6,138 +6,157 @@ import { chromium } from 'playwright';
 import stream from 'stream';
 
 import { getProxyConfiguration } from './proxies.js';
-import { LaunchOptions, Session, SessionType } from './types.js';
+import { LaunchOptions, Session, SessionData, SessionType } from './types.js';
 import { UnsupportedSessionError } from './errors.js';
 import { parseLaunchOptions, parseSessionParams as parseRequestParams } from './request.js';
 import { NODE_DEPENDENCIES } from './node.js';
 
+const SESSION_DATA_RETENTION = 1000 * 60 * 60 * 24 * 7; // 1 week
+
 export class SessionManager {
-    sessions = new Map<string, Session>();
+    // This duplication of information is necessary because only the serializable data is persisted.
+    sessionsData: Record<string, SessionData> = {};
+    sessions: Record<string, Session> = {};
 
     async init() {
-        this.sessions = await Actor.useState('SESSIONS', this.sessions);
+        this.sessionsData = await Actor.useState('SESSIONS', this.sessionsData);
+        const now = Date.now();
+        for (const [sessionId, sessionData] of Object.entries(this.sessionsData)) {
+            if (sessionData.endedAt && (now - sessionData.endedAt) > SESSION_DATA_RETENTION) {
+                delete this.sessionsData[sessionId];
+            }
+            if (sessionData.status === 'RUNNING') {
+                log.error('Found persisted running session: deleting it');
+                delete this.sessionsData[sessionId];
+            }
+        }
+        Actor.on('aborting', this.endAllSessions.bind(this));
+        Actor.on('exit', this.endAllSessions.bind(this));
+        Actor.on('migrating', this.endAllSessions.bind(this));
     }
 
     createSession(type: SessionType): string {
         const id = randomUUID();
-        this.sessions.set(id, { id, status: 'READY', type, browser: 'chromium', createdAt: Date.now() });
+        this.sessionsData[id] = { status: 'READY', type, browser: 'chromium', createdAt: Date.now() };
         return id;
     }
 
     async startSession(id: string, launchOptions: LaunchOptions): Promise<boolean> {
-        const session = this.sessions.get(id);
-        if (!session) {
+        const sessionData = this.sessionsData[id];
+        if (!sessionData) {
             log.error('Cannot start session: not found', { id });
             return false;
         }
 
-        switch (session.type) {
+        switch (sessionData.type) {
             case 'playwright':
                 try {
-                    session.server = await chromium.launchServer({
-                        proxy: await getProxyConfiguration(session.type, launchOptions),
-                        headless: launchOptions.launch?.headless,
-                        args: launchOptions.launch?.args,
-                        ignoreDefaultArgs: launchOptions.ignoreDefaultArgs,
-                        timeout: launchOptions.timeout,
-                    });
+                    this.sessions[id] = {
+                        server: await chromium.launchServer({
+                            proxy: await getProxyConfiguration(sessionData.type, launchOptions),
+                            headless: launchOptions.launch?.headless,
+                            args: launchOptions.launch?.args,
+                            ignoreDefaultArgs: launchOptions.ignoreDefaultArgs,
+                            timeout: launchOptions.timeout,
+                        }),
+                    };
                 } catch (e) {
-                    log.exception(e as Error, 'Failed to launch server', { sessionType: session.type, sessionId: session.id });
-                    session.status = 'ERROR';
+                    log.exception(e as Error, 'Failed to launch server', { sessionType: sessionData.type, sessionId: id });
+                    sessionData.status = 'ERROR';
                     return false;
                 }
-                session.startedAt = Date.now();
-                session.status = 'RUNNING';
+                sessionData.startedAt = Date.now();
+                sessionData.status = 'RUNNING';
                 break;
             default:
-                throw new UnsupportedSessionError(session.type);
+                throw new UnsupportedSessionError(sessionData.type);
         }
 
-        session.ttl = launchOptions.ttl;
+        sessionData.ttl = launchOptions.ttl;
 
         return true;
     }
 
     async endSession(id: string): Promise<boolean> {
-        const session = this.sessions.get(id);
-        if (!session) {
+        const sessionData = this.sessionsData[id];
+        const session = this.sessions[id];
+        if (!sessionData || !session) {
             log.error('Cannot end session: not found', { id });
-            return false;
-        }
-        if (!session.server) {
-            log.error('Cannot end session: server is undefined', { type: session.type, id });
             return false;
         }
 
         const endedAt = Date.now();
 
-        switch (session.type) {
+        switch (sessionData.type) {
             case 'playwright':
                 try {
                     await session.server.close();
+                    delete this.sessions[id];
                 } catch (e) {
-                    log.exception(e as Error, 'Failed to close server', { sessionType: session.type, sessionId: session.id });
-                    session.status = 'ERROR';
+                    log.exception(e as Error, 'Failed to close server', { sessionType: sessionData.type, sessionId: id });
+                    sessionData.status = 'ERROR';
                     return false;
                 }
                 break;
             default:
-                throw new UnsupportedSessionError(session.type);
+                throw new UnsupportedSessionError(sessionData.type);
         }
 
-        session.endedAt = endedAt;
-        session.status = 'COMPLETED';
-        log.info('Session ended', { type: session.type, id, endedAt });
+        sessionData.endedAt = endedAt;
+        sessionData.status = 'COMPLETED';
+        log.info('Session ended', { type: sessionData.type, id, endedAt });
 
         return true;
     }
 
+    async endAllSessions() {
+        await Promise.all(Object.keys(this.sessions).map((sessionId) => this.endSession(sessionId)));
+    }
+
     async disconnectSession(id: string): Promise<boolean> {
-        const session = this.sessions.get(id);
-        if (!session) {
+        const sessionData = this.sessionsData[id];
+        const session = this.sessions[id];
+        if (!sessionData || !session) {
             log.error('Cannot disconnect session: not found', { id });
             return false;
         }
 
-        if (session.ttl) {
-            session.expiresAt = Date.now() + session.ttl;
+        if (sessionData.ttl) {
+            sessionData.expiresAt = Date.now() + sessionData.ttl;
             log.info('Disconnected from session, setting timeout', {
-                type: session.type,
+                type: sessionData.type,
                 id,
-                timeout: session.ttl,
-                expiresAt: session.expiresAt,
+                timeout: sessionData.ttl,
+                expiresAt: sessionData.expiresAt,
             });
-            session.closureTimeout = setTimeout(() => this.endSession(id), session.ttl);
+            session.closureTimeout = setTimeout(() => this.endSession(id), sessionData.ttl);
         } else {
-            log.info('Disconnected from session, ending', { type: session.type, id });
+            log.info('Disconnected from session, ending', { type: sessionData.type, id });
             await this.endSession(id);
         }
 
         return true;
     }
 
-    async proxySession(id: string, req: http.IncomingMessage, socket: stream.Duplex, head: Buffer): Promise<boolean> {
-        const session = this.sessions.get(id);
-        if (!session) {
+    async connectSession(id: string, req: http.IncomingMessage, socket: stream.Duplex, head: Buffer): Promise<boolean> {
+        const sessionData = this.sessionsData[id];
+        const session = this.sessions[id];
+        if (!sessionData || !session) {
             log.error('Cannot proxy session: not found, closing socket', { id });
             socket.end();
             return false;
         }
-        if (session.status !== 'RUNNING') {
-            log.error('Trying to connect to a session which is not running', { type: session.type, id });
+        if (sessionData.status !== 'RUNNING') {
+            log.error('Trying to connect to a session which is not running', { type: sessionData.type, id });
             socket.end();
-            return false;
-        }
-        if (!session.server) {
-            log.error('Cannot proxy session: server is undefined', { type: session.type, id });
             return false;
         }
 
         if (session.closureTimeout) {
-            log.info('Connection opened again: session timeout canceled', { type: session.type, id });
+            log.info('Connection opened again: session timeout canceled', { type: sessionData.type, id });
             clearTimeout(session.closureTimeout);
             delete session.closureTimeout;
-            delete session.expiresAt;
+            delete sessionData.expiresAt;
         }
 
         const wsEndpoint = session.server.wsEndpoint();
@@ -197,7 +216,7 @@ export async function connectSession(
     }
 
     if (launchOptions.sessionId) {
-        const session = sessionManager.sessions.get(launchOptions.sessionId);
+        const session = sessionManager.sessionsData[launchOptions.sessionId];
         if (!session) {
             log.error('Session not found', { id: launchOptions.sessionId });
             socket.end();
@@ -219,7 +238,7 @@ export async function connectSession(
             socket.end();
             return;
         }
-        await sessionManager.proxySession(launchOptions.sessionId, req, socket, head);
+        await sessionManager.connectSession(launchOptions.sessionId, req, socket, head);
         return;
     }
 
@@ -230,5 +249,5 @@ export async function connectSession(
         socket.end();
         return;
     }
-    await sessionManager.proxySession(id, req, socket, head);
+    await sessionManager.connectSession(id, req, socket, head);
 }

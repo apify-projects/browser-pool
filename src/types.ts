@@ -43,19 +43,18 @@ export interface RequestParams {
 
 export type SessionStatus = 'READY' | 'RUNNING' | 'ERROR' | 'TIMED_OUT' | 'COMPLETED'
 
-interface SessionBasicInfo {
-    id: string
+export interface SessionData {
+    type: 'playwright'
+    browser: 'chromium'
     status: SessionStatus
     createdAt?: number
     startedAt?: number
     endedAt?: number
     expiresAt?: number
     ttl?: number
-    closureTimeout?: NodeJS.Timeout
 }
 
-export interface Session extends SessionBasicInfo {
-    type: 'playwright'
-    browser: 'chromium'
-    server?: BrowserServer
+export interface Session {
+    server: BrowserServer
+    closureTimeout?: NodeJS.Timeout
 }
