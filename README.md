@@ -10,17 +10,15 @@ Because it can rely on well tested features by Apify, such as proxies, which hel
 
 ## How to use Browser Pool
 
-Go to the *Standby* tab and copy the *Actor URL*.
+1. Go to the *Standby* tab and copy the *Actor URL*.
 
-![Standby tab](./assets/standby-tab.png)
-
-Replace `https://` with `wss://`: you now have the URL for connecting your Playwright session to Apify through [CDP](https://chromedevtools.github.io/devtools-protocol/), which looks something like this:
+2. Replace `https://` with `wss://`: you now have the URL for connecting your Playwright session to Apify through [CDP](https://chromedevtools.github.io/devtools-protocol/), which looks something like this:
 
 ```
 wss://marco-gullo--browser-pool.apify.actor?token=$TOKEN
 ```
 
-Finally, you can use the URL with Playwright. Let's say you want to generate and download the emoji of a *smiling rocket* on [emojikitchen.dev](https://emojikitchen.dev/):
+3. Finally, you can use the URL with Playwright. Let's say you want to generate and download the emoji of a *smiling rocket* on [emojikitchen.dev](https://emojikitchen.dev/):
 
 ```js
 import fs from 'fs;
@@ -55,7 +53,7 @@ await browser.close();
 
 This code is executed locally, and in the end you will have this nice picture on your computer:
 
-![Rocket Smile](./assets/rocket-smile.png)
+![Rocket Smile](https://www.gstatic.com/android/keyboard/emojikitchen/20240206/u1f680/u1f680_u1f604.png)
 
 Nevertheless, the browser runs on the Apify platform, so there is no need for you to install Chromium.\
 Moreover, you can mock your location or try to circumvent blocks using Apify's proxies.
