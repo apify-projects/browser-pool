@@ -7,3 +7,5 @@ tsconfig.tsbuildinfo
 
 # Added by Apify CLI
 .venv
+
+.DS_Store

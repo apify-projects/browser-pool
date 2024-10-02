@@ -1,20 +1,70 @@
 # Browser Pool
 
-A Standby Actor for providing a pool of on-demand browsers, accessible through CDP.
+## What is Browser Pool?
 
-## How to use it
+Browser Pool is a tool that leverages the Apify platform and provides you with headless browsers for building AI agents.
 
-```js
-import { chromium } from 'playwright';
+## Why using Browser Pool?
 
-// The Standby URL with `wss` instead of `https`
-const wsEndpoint = 'wss://marco-gullo--browser-pool.apify.actor?token=$TOKEN&other_params...'
-const browser = await chromium.connect(wsEndpoint)
+Because it can rely on well tested features by Apify, such as proxies, which help to circumvent obstacles and let you concentrate on developing the online automation.
+
+## How to use Browser Pool
+
+Go to the *Standby* tab and copy the *Actor URL*.
+
+![Standby tab](./assets/standby-tab.png)
+
+Replace `https://` with `wss://`: you now have the URL for connecting your Playwright session to Apify through [CDP](https://chromedevtools.github.io/devtools-protocol/), which looks something like this:
+
+```
+wss://marco-gullo--browser-pool.apify.actor?token=$TOKEN
 ```
 
-### Available parameters
+Finally, you can use the URL with Playwright. Let's say you want to generate and download the emoji of a *smiling rocket* on [emojikitchen.dev](https://emojikitchen.dev/):
 
-The search parameters are designed to be compatible with [browserless.io](https://docs.browserless.io).
+```js
+import fs from 'fs;
+import { chromium } from 'playwright';
+
+console.log('Connecting to a remote browser on the Apify platform');
+const wsEndpoint = 'wss://marco-gullo--browser-pool.apify.actor?token=$TOKEN&other_params...';
+const browser = await chromium.connect(wsEndpoint);
+
+console.log('Browser connection established, creating context');
+const context = await browser.newContext({ viewport: { height: 1000, width: 1600 } });
+
+console.log('Opening new page');
+const page = await context.newPage();
+
+const timeout = 60_000;
+console.log(`Going to: ${url}. Timeout = ${timeout}ms`);
+await page.goto(url, { timeout });
+
+console.log('Selecting emojis');
+await page.getByRole('img', { name: 'rocket' }).first().click();
+await page.getByRole('img', { name: 'smile', exact: true }).nth(1).click();
+
+console.log('Saving screenshot');
+const screenshot = await page.getByRole('img', { name: 'rocket-smile' }).screenshot();
+fs.writeFileSync('rocket-smile.png', screenshot);
+
+console.log('Closing the browser');
+await context.close();
+await browser.close();
+```
+
+This code is executed locally, and in the end you will have this nice picture on your computer:
+
+![Rocket Smile](./assets/rocket-smile.png)
+
+Nevertheless, the browser runs on the Apify platform, so there is no need for you to install Chromium.\
+Moreover, you can mock your location or try to circumvent blocks using Apify's proxies.
+To do so, you need to use search parameters: see below.
+
+### Search parameters
+
+You can customize your session using search parameters.
+They are designed to be compatible with [browserless.io](https://docs.browserless.io):
 
 - `proxy`: either `datacenter` or `residential`; selects the corresponding default proxy groups.
 - `proxyGroups`: stringified JSON of an array of Apify proxy groups, e.g., `["RESIDENTIAL5"]`.
@@ -26,30 +76,8 @@ The search parameters are designed to be compatible with [browserless.io](https:
 - `timeout`: maximum allowed time to spawn the browser server, in milliseconds.
 - `ttl`: time to live, in milliseconds, of the browser session after the socket has been closed.
 
-TODO:
+For example, if you wanted to use Apify's residential proxies from the United States, your URL would look like this:
 
-- `blockAds`: may use a browser extension.
-- `launch.stealth`: may use Apify fingerprinting to avoid blocks.
-
-TODO: implement the ability to set options using headers, to be compatible with [browserbase.com](https://www.browserbase.com/).
-
-## TODO
-
-- [x] Expose CDP-interface via Standby mode
-- [ ] Run an auto-scaled pool of web browsers and provide access to them via CDP
-- [ ] Pre-configure with our browser fingerprinting and proxies to reduce blocking
-
-Bonus:
-
-- [ ] Playwright - automatically select a client-matching version
-
-## Support
-
-- [x] Playwright - Chromium
-- [ ] Playwright - Chrome
-- [ ] Playwright - Firefox
-- [ ] Playwright - WebKit
-- [ ] Puppeteer - Chromium
-- [ ] Puppeteer - Chrome
-- [ ] Bare CDP - Chromium
-- [ ] Bare CDP - Chrome
+```
+wss://marco-gullo--browser-pool.apify.actor?token=$TOKEN&proxy=residential&proxyCountry=us
+```
